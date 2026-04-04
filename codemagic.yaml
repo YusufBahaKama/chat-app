@@ -72,4 +72,5 @@ workflows:
           zip -r -q ../unsigned-build.ipa Payload
           rm -rf Payload
     artifacts:
-      - apps/mobile/*.ipa
+      - "*.ipa"
+      - "apps/mobile/*.ipa"
