@@ -13,8 +13,22 @@ workflows:
           pnpm install
       - name: Expo Prebuild
         script: |
+          set -e
           cd apps/mobile
-          pnpm exec expo prebuild --platform ios --clean
+          echo "Running expo prebuild..."
+          pnpm exec expo prebuild --platform ios --clean --no-install
+          
+          echo "Files in apps/mobile after prebuild:"
+          ls -la
+          
+          if [ ! -d "ios" ]; then
+            echo "ERROR: ios directory was not created!"
+            exit 1
+          fi
+          
+          echo "Installing CocoaPods..."
+          cd ios
+          pod install
       - name: Build Unsigned iOS App
         script: |
           cd apps/mobile/ios
