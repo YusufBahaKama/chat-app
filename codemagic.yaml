@@ -1,9 +1,48 @@
 workflows:
-
-    sample-workflow:
-
-        name: Codemagic Sample Workflow
-
-        max_build_duration: 120
-
-        instance_type: mac_mini_m2
+  ios-unsigned-build:
+    name: Build Unsigned iOS IPA for Sideloadly
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    environment:
+      node: 20
+    scripts:
+      - name: Install pnpm and dependencies
+        script: |
+          corepack enable pnpm
+          pnpm install
+      - name: Expo Prebuild
+        script: |
+          cd apps/mobile
+          npx expo prebuild --platform ios --clean
+      - name: Build Unsigned iOS App
+        script: |
+          cd apps/mobile/ios
+          
+          # Expo automatically generates the workspace and scheme based on app.json
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME=$(ls -d *.xcodeproj | head -1 | sed 's/\.xcodeproj//')
+          
+          echo "Building Workspace: $WORKSPACE, Scheme: $SCHEME"
+          
+          # Build specifically for arm64 (physical iPhones) bypassing code-signing requirements
+          xcodebuild build \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED="NO" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_ALLOWED="NO"
+            
+          # Prepare the IPA format (Payload/App.app -> zip) for Sideloadly
+          echo "Packaging .app into .ipa for Sideloadly..."
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -name "*.app" | head -1)
+          
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -r -q ../unsigned-build.ipa Payload
+          rm -rf Payload
+    artifacts:
+      - apps/mobile/*.ipa
