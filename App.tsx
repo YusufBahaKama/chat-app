@@ -147,7 +147,7 @@ export default function App() {
 
         setReady(true);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? `${err.message}\n\n${err.stack}` : String(err);
         setInitError(msg);
       }
     }
@@ -164,7 +164,7 @@ export default function App() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Startup error</Text>
-        <Text style={styles.errorDetail}>{initError}</Text>
+        <Text style={styles.errorDetail} selectable>{initError}</Text>
       </View>
     );
   }
