@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation';
 import { useAppStore } from '../store';
-import { joinQueue, leaveSession } from '../services/matchmakingService';
+import { joinQueue, leaveQueue, leaveSession } from '../services/matchmakingService';
 import type { ActiveSession } from '../services/matchmakingService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Inbox'>;
@@ -111,6 +111,16 @@ export function InboxScreen({ navigation }: Props) {
     }
   }, [deviceToken, clientId, matchStatus, setMatchStatus, setError]);
 
+  const handleCancelSearch = useCallback(async () => {
+    if (!deviceToken) return;
+    try {
+      await leaveQueue({ deviceToken });
+    } catch {
+      // best-effort; reset state regardless
+    }
+    setMatchStatus('idle');
+  }, [deviceToken, setMatchStatus]);
+
   const handleLeave = useCallback(
     async (sessionId: string) => {
       if (!deviceToken) return;
@@ -166,19 +176,29 @@ export function InboxScreen({ navigation }: Props) {
       )}
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.findButton, isSearching && styles.findButtonDisabled]}
-          onPress={handleFindChat}
-          disabled={isSearching}
-          accessibilityRole="button"
-          accessibilityLabel={isSearching ? 'Searching for a chat partner' : 'Find a new chat'}
-        >
-          {isSearching ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
+        {isSearching ? (
+          <View style={styles.searchingRow}>
+            <ActivityIndicator color="#3b82f6" style={styles.searchSpinner} />
+            <Text style={styles.searchingText}>Searching…</Text>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleCancelSearch}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel search"
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.findButton}
+            onPress={handleFindChat}
+            accessibilityRole="button"
+            accessibilityLabel="Find a new chat"
+          >
             <Text style={styles.findButtonText}>Find a chat</Text>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -269,8 +289,31 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  findButtonDisabled: {
-    backgroundColor: '#1e3a5f',
+  searchingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  searchSpinner: {
+    marginRight: 10,
+  },
+  searchingText: {
+    color: '#888',
+    fontSize: 15,
+    flex: 1,
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  cancelButtonText: {
+    color: '#aaa',
+    fontSize: 14,
+    fontWeight: '600',
   },
   findButtonText: {
     color: '#ffffff',

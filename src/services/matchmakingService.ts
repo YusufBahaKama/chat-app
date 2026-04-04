@@ -15,6 +15,23 @@ export interface JoinQueueOptions {
   clientId: string;
 }
 
+/** POST /api/v1/match/queue/leave — cancel queue search before a match is made */
+export async function leaveQueue({ deviceToken }: { deviceToken: string }): Promise<void> {
+  const response = await fetch(`${Config.API_BASE_URL}/api/v1/match/queue/leave`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${deviceToken}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Leave queue failed (${response.status}): ${text}`);
+  }
+}
+
 /** POST /api/v1/match/join */
 export async function joinQueue({ deviceToken }: JoinQueueOptions): Promise<void> {
   const response = await fetch(`${Config.API_BASE_URL}/api/v1/match/join`, {
