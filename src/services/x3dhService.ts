@@ -65,7 +65,7 @@ export async function performX3DH(
   // Insert session metadata row BEFORE calling processPreKey so that
   // saveSession (called internally) can associate it correctly if needed.
   const now = Math.floor(Date.now() / 1000);
-  await db.executeAsync(
+  await db.execute(
     `INSERT OR REPLACE INTO sessions
        (session_id, partner_id, created_at, last_active_at)
      VALUES (?, ?, ?, ?)`,

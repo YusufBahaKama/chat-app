@@ -69,7 +69,7 @@ export async function sendMessage(opts: OutboundMessage): Promise<string> {
 
   // Persist outbound message to local SQLCipher
   const now = Math.floor(Date.now() / 1000);
-  await db.executeAsync(
+  await db.execute(
     `INSERT INTO messages (msg_id, session_id, direction, plaintext, timestamp, delivered)
      VALUES (?, ?, 'sent', ?, ?, 0)`,
     [messageId, opts.sessionId, opts.plaintext, now],
@@ -98,7 +98,7 @@ export async function handleIncomingMessage(
   );
 
   // Persist decrypted plaintext to local DB (never to server — C14)
-  await db.executeAsync(
+  await db.execute(
     `INSERT OR IGNORE INTO messages
        (msg_id, session_id, direction, plaintext, timestamp, delivered)
      VALUES (?, ?, 'received', ?, ?, 1)`,
@@ -142,7 +142,7 @@ async function ackMessage(
 /** Load all messages for a session from SQLCipher, ordered oldest-first. */
 export async function loadMessages(sessionId: string): Promise<StoredMessage[]> {
   const db = await getDatabase();
-  const result = await db.executeAsync(
+  const result = await db.execute(
     `SELECT msg_id, session_id, direction, plaintext, timestamp, delivered
      FROM messages
      WHERE session_id = ?

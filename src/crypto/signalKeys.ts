@@ -46,7 +46,7 @@ export async function generateAndStoreKeys(db: DB): Promise<KeyBundle> {
   }
 
   // Persist to SQLCipher (C3: private keys stay on device)
-  await db.executeAsync(
+  await db.execute(
     'INSERT OR REPLACE INTO identity_keys (type, public_key, private_key) VALUES (?, ?, ?)',
     [
       'self',
@@ -55,7 +55,7 @@ export async function generateAndStoreKeys(db: DB): Promise<KeyBundle> {
     ],
   );
 
-  await db.executeAsync(
+  await db.execute(
     `INSERT OR REPLACE INTO pre_keys
        (key_id, type, public_key, private_key, spk_sig, consumed)
      VALUES (?, 'signed', ?, ?, ?, 0)`,
@@ -69,7 +69,7 @@ export async function generateAndStoreKeys(db: DB): Promise<KeyBundle> {
   );
 
   for (const opk of opks) {
-    await db.executeAsync(
+    await db.execute(
       'INSERT OR REPLACE INTO pre_keys (key_id, type, public_key, private_key, consumed) VALUES (?, ?, ?, ?, ?)',
       [
         opk.keyId,
@@ -95,7 +95,7 @@ export async function generateAndStoreKeys(db: DB): Promise<KeyBundle> {
 
 /** Load the local identity private key from SQLCipher. */
 export async function loadIdentityPrivateKey(db: DB): Promise<ArrayBuffer> {
-  const result = await db.executeAsync(
+  const result = await db.execute(
     "SELECT private_key FROM identity_keys WHERE type = 'self'",
   );
   const row = result.rows?.[0] as { private_key: Uint8Array } | undefined;
@@ -108,7 +108,7 @@ export async function loadIdentityPrivateKey(db: DB): Promise<ArrayBuffer> {
 
 /** Load the local signed pre-key private key from SQLCipher. */
 export async function loadSignedPreKeyPrivate(db: DB): Promise<ArrayBuffer> {
-  const result = await db.executeAsync(
+  const result = await db.execute(
     "SELECT private_key FROM pre_keys WHERE type = 'signed' AND consumed = 0 LIMIT 1",
   );
   const row = result.rows?.[0] as { private_key: Uint8Array } | undefined;
@@ -124,7 +124,7 @@ export async function loadOneTimePreKeyPrivate(
   db: DB,
   keyId: number,
 ): Promise<ArrayBuffer> {
-  const result = await db.executeAsync(
+  const result = await db.execute(
     "SELECT private_key FROM pre_keys WHERE type = 'one_time' AND key_id = ? LIMIT 1",
     [keyId],
   );
@@ -138,7 +138,7 @@ export async function loadOneTimePreKeyPrivate(
 
 /** Mark an OPK as consumed after X3DH. */
 export async function markOpkConsumed(db: DB, keyId: number): Promise<void> {
-  await db.executeAsync(
+  await db.execute(
     "UPDATE pre_keys SET consumed = 1 WHERE type = 'one_time' AND key_id = ?",
     [keyId],
   );

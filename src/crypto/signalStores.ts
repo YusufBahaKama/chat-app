@@ -30,7 +30,7 @@ function toArrayBuffer(buf: Uint8Array): ArrayBuffer {
 export function makeSignalStore(db: DB): StorageType {
   return {
     async getIdentityKeyPair(): Promise<KeyPairType | undefined> {
-      const result = await db.executeAsync(
+      const result = await db.execute(
         `SELECT public_key, private_key FROM identity_keys WHERE type = 'self'`
       );
       const row = result.rows?.[0] as { public_key: Uint8Array; private_key: Uint8Array } | undefined;
@@ -50,7 +50,7 @@ export function makeSignalStore(db: DB): StorageType {
       identityKey: ArrayBuffer,
       _direction: Direction
     ): Promise<boolean> {
-      const result = await db.executeAsync(
+      const result = await db.execute(
         `SELECT identity_key FROM trusted_identities WHERE address = ?`,
         [identifier]
       );
@@ -65,13 +65,13 @@ export function makeSignalStore(db: DB): StorageType {
       _nonblockingApproval?: boolean
     ): Promise<boolean> {
       const newBytes = toBuffer(publicKey);
-      const existing = await db.executeAsync(
+      const existing = await db.execute(
         `SELECT identity_key FROM trusted_identities WHERE address = ?`,
         [encodedAddress]
       );
       const existingRow = existing.rows?.[0] as { identity_key: Uint8Array } | undefined;
 
-      await db.executeAsync(
+      await db.execute(
         `INSERT OR REPLACE INTO trusted_identities (address, identity_key) VALUES (?, ?)`,
         [encodedAddress, newBytes]
       );
@@ -81,7 +81,7 @@ export function makeSignalStore(db: DB): StorageType {
     },
 
     async loadPreKey(keyId: string | number): Promise<KeyPairType | undefined> {
-      const result = await db.executeAsync(
+      const result = await db.execute(
         `SELECT public_key, private_key FROM pre_keys WHERE key_id = ? AND type = 'one_time'`,
         [Number(keyId)]
       );
@@ -96,7 +96,7 @@ export function makeSignalStore(db: DB): StorageType {
     async storePreKey(keyId: number | string, keyPair: KeyPairType): Promise<void> {
       const pub = toBuffer(keyPair.pubKey);
       const priv = toBuffer(keyPair.privKey);
-      await db.executeAsync(
+      await db.execute(
         `INSERT OR REPLACE INTO pre_keys (key_id, type, public_key, private_key, consumed)
          VALUES (?, 'one_time', ?, ?, 0)`,
         [Number(keyId), pub, priv]
@@ -104,7 +104,7 @@ export function makeSignalStore(db: DB): StorageType {
     },
 
     async removePreKey(keyId: number | string): Promise<void> {
-      await db.executeAsync(
+      await db.execute(
         `UPDATE pre_keys SET consumed = 1 WHERE key_id = ? AND type = 'one_time'`,
         [Number(keyId)]
       );
@@ -112,14 +112,14 @@ export function makeSignalStore(db: DB): StorageType {
 
     async storeSession(encodedAddress: string, record: SessionRecordType): Promise<void> {
       const blob = Buffer.from(record, 'utf8');
-      await db.executeAsync(
+      await db.execute(
         `INSERT OR REPLACE INTO signal_sessions (address, record_data) VALUES (?, ?)`,
         [encodedAddress, blob]
       );
     },
 
     async loadSession(encodedAddress: string): Promise<SessionRecordType | undefined> {
-      const result = await db.executeAsync(
+      const result = await db.execute(
         `SELECT record_data FROM signal_sessions WHERE address = ?`,
         [encodedAddress]
       );
@@ -129,7 +129,7 @@ export function makeSignalStore(db: DB): StorageType {
     },
 
     async loadSignedPreKey(keyId: number | string): Promise<KeyPairType | undefined> {
-      const result = await db.executeAsync(
+      const result = await db.execute(
         `SELECT public_key, private_key FROM pre_keys WHERE key_id = ? AND type = 'signed'`,
         [Number(keyId)]
       );
@@ -144,7 +144,7 @@ export function makeSignalStore(db: DB): StorageType {
     async storeSignedPreKey(keyId: number | string, keyPair: KeyPairType): Promise<void> {
       const pub = toBuffer(keyPair.pubKey);
       const priv = toBuffer(keyPair.privKey);
-      await db.executeAsync(
+      await db.execute(
         `INSERT OR REPLACE INTO pre_keys (key_id, type, public_key, private_key, consumed)
          VALUES (?, 'signed', ?, ?, 0)`,
         [Number(keyId), pub, priv]
@@ -152,7 +152,7 @@ export function makeSignalStore(db: DB): StorageType {
     },
 
     async removeSignedPreKey(keyId: number | string): Promise<void> {
-      await db.executeAsync(
+      await db.execute(
         `UPDATE pre_keys SET consumed = 1 WHERE key_id = ? AND type = 'signed'`,
         [Number(keyId)]
       );

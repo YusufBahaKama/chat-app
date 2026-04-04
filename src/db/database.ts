@@ -23,12 +23,12 @@ export async function getDatabase(): Promise<DB> {
     encryptionKey: key,
   });
 
-  await _db.executeAsync(SCHEMA_SQL);
+  await _db.execute(SCHEMA_SQL);
 
   // Run migrations (each is idempotent — errors from duplicate columns are ignored)
   for (const stmt of MIGRATION_SQL_STATEMENTS) {
     try {
-      await _db.executeAsync(stmt);
+      await _db.execute(stmt);
     } catch {
       // Column already exists or other non-fatal migration error — skip
     }
@@ -46,7 +46,7 @@ export async function secureWipeSession(
   sessionId: string,
 ): Promise<void> {
   // Wipe the libsignal SessionRecord from signal_sessions
-  await db.executeAsync(
+  await db.execute(
     `DELETE FROM signal_sessions
       WHERE address IN (
         SELECT partner_id || '.1' FROM sessions WHERE session_id = ?
@@ -55,7 +55,7 @@ export async function secureWipeSession(
   );
 
   // Wipe trusted identity for the partner
-  await db.executeAsync(
+  await db.execute(
     `DELETE FROM trusted_identities
       WHERE address IN (
         SELECT partner_id || '.1' FROM sessions WHERE session_id = ?
@@ -64,13 +64,13 @@ export async function secureWipeSession(
   );
 
   // Delete messages first (FK dependency)
-  await db.executeAsync(
+  await db.execute(
     'DELETE FROM messages WHERE session_id = ?',
     [sessionId],
   );
 
   // Delete session metadata
-  await db.executeAsync(
+  await db.execute(
     'DELETE FROM sessions WHERE session_id = ?',
     [sessionId],
   );

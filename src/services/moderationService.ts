@@ -17,7 +17,7 @@ export async function submitReport(
   const db = getDatabase();
 
   // 1. Fetch recent messages for session
-  const res = await db.executeAsync(
+  const res = await db.execute(
     'SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp DESC LIMIT 50',
     [sessionId]
   );
