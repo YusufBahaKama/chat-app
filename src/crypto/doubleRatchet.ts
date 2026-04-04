@@ -1,37 +1,29 @@
 /**
  * Double Ratchet encrypt / decrypt.
  *
- * C11 — Uses @signalapp/libsignal-client SessionCipher exclusively.
+ * C11 — Uses @privacyresearch/libsignal-protocol-typescript SessionCipher exclusively.
  * C3  — Ratchet state (SessionRecord) stored only in SQLCipher, never sent to server.
  *
  * The SessionRecord is loaded from the SQLCipher-backed SignalSessionStore,
  * the ratchet is advanced by SessionCipher, and the updated record is
  * automatically persisted back via saveSession.
  *
- * cipher_type values:
- *   CiphertextMessageType.PreKey   (3) — first message establishing session
- *   CiphertextMessageType.Whisper  (2) — all subsequent messages
+ * cipherType values:
+ *   3 — PreKeyWhisperMessage (first message establishing session)
+ *   2 — WhisperMessage (all subsequent messages)
  */
 
 import {
-  ProtocolAddress,
   SessionCipher,
-  PreKeySignalMessage,
-  SignalMessage,
-  CiphertextMessageType,
-} from '@signalapp/libsignal-client';
+  SignalProtocolAddress,
+} from '@privacyresearch/libsignal-protocol-typescript';
 import type { DB } from '@op-engineering/op-sqlite';
-import {
-  makeSessionStore,
-  makeIdentityKeyStore,
-  makePreKeyStore,
-  makeSignedPreKeyStore,
-} from './signalStores';
+import { makeSignalStore } from './signalStores';
 
 const PARTNER_DEVICE_ID = 1;
 
 export interface EncryptResult {
-  /** Base64-encoded serialized ciphertext (CiphertextMessage). */
+  /** Serialized ciphertext (base64 or hex, libsignal provides a string depending on encoding). We expect the raw string/base64 here. */
   ciphertext: string;
   /** CiphertextMessageType: 2 = Whisper/Signal, 3 = PreKey. */
   cipherType: number;
@@ -46,20 +38,20 @@ export async function encryptMessage(
   partnerId: string,
   plaintext: string,
 ): Promise<EncryptResult> {
-  const address = new ProtocolAddress(partnerId, PARTNER_DEVICE_ID);
-  const sessionStore = makeSessionStore(db);
-  const identityKeyStore = makeIdentityKeyStore(db);
+  const address = new SignalProtocolAddress(partnerId, PARTNER_DEVICE_ID);
+  const store = makeSignalStore(db);
+  const cipher = new SessionCipher(store, address);
 
-  const msg = await SessionCipher.encryptMessage(
-    Buffer.from(plaintext, 'utf8'),
-    address,
-    sessionStore,
-    identityKeyStore,
+  const plaintextBuffer = Buffer.from(plaintext, 'utf8').buffer.slice(
+    Buffer.from(plaintext, 'utf8').byteOffset,
+    Buffer.from(plaintext, 'utf8').byteOffset + Buffer.from(plaintext, 'utf8').byteLength
   );
 
+  const msg = await cipher.encrypt(plaintextBuffer);
+
   return {
-    ciphertext: Buffer.from(msg.serialize()).toString('base64'),
-    cipherType: msg.type(),
+    ciphertext: msg.body ?? '',
+    cipherType: msg.type,
   };
 }
 
@@ -70,36 +62,19 @@ export async function encryptMessage(
 export async function decryptMessage(
   db: DB,
   partnerId: string,
-  ciphertextB64: string,
+  ciphertextString: string,
   cipherType: number,
 ): Promise<string> {
-  const address = new ProtocolAddress(partnerId, PARTNER_DEVICE_ID);
-  const sessionStore = makeSessionStore(db);
-  const identityKeyStore = makeIdentityKeyStore(db);
-  const ciphertextBuf = Buffer.from(ciphertextB64, 'base64');
+  const address = new SignalProtocolAddress(partnerId, PARTNER_DEVICE_ID);
+  const store = makeSignalStore(db);
+  const cipher = new SessionCipher(store, address);
 
-  let plaintextBytes: Uint8Array;
+  let plaintextBytes: ArrayBuffer;
 
-  if (cipherType === CiphertextMessageType.PreKey) {
-    const message = PreKeySignalMessage.deserialize(ciphertextBuf);
-    const preKeyStore = makePreKeyStore(db);
-    const signedPreKeyStore = makeSignedPreKeyStore(db);
-    plaintextBytes = await SessionCipher.decryptPreKeySignalMessage(
-      message,
-      address,
-      sessionStore,
-      identityKeyStore,
-      preKeyStore,
-      signedPreKeyStore,
-    );
+  if (cipherType === 3) {
+    plaintextBytes = await cipher.decryptPreKeyWhisperMessage(ciphertextString, 'binary');
   } else {
-    const message = SignalMessage.deserialize(ciphertextBuf);
-    plaintextBytes = await SessionCipher.decryptSignalMessage(
-      message,
-      address,
-      sessionStore,
-      identityKeyStore,
-    );
+    plaintextBytes = await cipher.decryptWhisperMessage(ciphertextString, 'binary');
   }
 
   return Buffer.from(plaintextBytes).toString('utf8');

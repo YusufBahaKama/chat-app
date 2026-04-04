@@ -1,7 +1,7 @@
 /**
  * X3DH key agreement — delegates to libsignal SessionBuilder.
  *
- * C11 — Uses @signalapp/libsignal-client SessionBuilder (no manual DH).
+ * C11 — Uses @privacyresearch/libsignal-protocol-typescript SessionBuilder (no manual DH).
  * C3  — Private keys never leave this device.
  *
  * Both matched clients call this to establish a session from the partner's
@@ -11,13 +11,11 @@
  */
 
 import {
-  PublicKey,
-  PreKeyBundle,
-  ProtocolAddress,
   SessionBuilder,
-} from '@signalapp/libsignal-client';
+  SignalProtocolAddress,
+} from '@privacyresearch/libsignal-protocol-typescript';
 import type { DB } from '@op-engineering/op-sqlite';
-import { makeSessionStore, makeIdentityKeyStore } from '../crypto/signalStores';
+import { makeSignalStore } from '../crypto/signalStores';
 
 /** Partner key bundle received in the match:found WebSocket event. */
 export interface PartnerBundle {
@@ -35,7 +33,7 @@ const PARTNER_DEVICE_ID = 1;
 /**
  * Establish a Signal Protocol session with the matched partner.
  * Inserts a session metadata row and stores the SessionRecord via
- * the SQLCipher-backed SessionStore.
+ * the SQLCipher-backed SignalStore.
  */
 export async function performX3DH(
   db: DB,
@@ -43,34 +41,29 @@ export async function performX3DH(
   partnerId: string,
   bundle: PartnerBundle,
 ): Promise<void> {
-  const ikB = PublicKey.deserialize(
-    Buffer.from(bundle.identity_key, 'base64'),
+  const ikB = Buffer.from(bundle.identity_key, 'base64').buffer.slice(
+    Buffer.from(bundle.identity_key, 'base64').byteOffset,
+    Buffer.from(bundle.identity_key, 'base64').byteOffset + Buffer.from(bundle.identity_key, 'base64').byteLength
   );
-  const spkB = PublicKey.deserialize(
-    Buffer.from(bundle.signed_pre_key, 'base64'),
+  const spkB = Buffer.from(bundle.signed_pre_key, 'base64').buffer.slice(
+    Buffer.from(bundle.signed_pre_key, 'base64').byteOffset,
+    Buffer.from(bundle.signed_pre_key, 'base64').byteOffset + Buffer.from(bundle.signed_pre_key, 'base64').byteLength
   );
-  const spkSig = Buffer.from(bundle.spk_signature, 'base64');
+  const spkSig = Buffer.from(bundle.spk_signature, 'base64').buffer.slice(
+    Buffer.from(bundle.spk_signature, 'base64').byteOffset,
+    Buffer.from(bundle.spk_signature, 'base64').byteOffset + Buffer.from(bundle.spk_signature, 'base64').byteLength
+  );
 
   const opkId = bundle.one_time_pre_key?.key_id ?? null;
   const opkPub = bundle.one_time_pre_key
-    ? PublicKey.deserialize(
-        Buffer.from(bundle.one_time_pre_key.public_key, 'base64'),
+    ? Buffer.from(bundle.one_time_pre_key.public_key, 'base64').buffer.slice(
+        Buffer.from(bundle.one_time_pre_key.public_key, 'base64').byteOffset,
+        Buffer.from(bundle.one_time_pre_key.public_key, 'base64').byteOffset + Buffer.from(bundle.one_time_pre_key.public_key, 'base64').byteLength
       )
     : null;
 
-  const preKeyBundle = PreKeyBundle.new(
-    PARTNER_REGISTRATION_ID,
-    PARTNER_DEVICE_ID,
-    opkId,
-    opkPub,
-    bundle.spk_id,
-    spkB,
-    spkSig,
-    ikB,
-  );
-
-  // Insert session metadata row BEFORE calling processPreKeyBundle so that
-  // saveSession (called internally) can find the row by partner_id.
+  // Insert session metadata row BEFORE calling processPreKey so that
+  // saveSession (called internally) can associate it correctly if needed.
   const now = Math.floor(Date.now() / 1000);
   await db.executeAsync(
     `INSERT OR REPLACE INTO sessions
@@ -79,16 +72,26 @@ export async function performX3DH(
     [sessionId, partnerId, now, now],
   );
 
-  const address = new ProtocolAddress(partnerId, PARTNER_DEVICE_ID);
-  const sessionStore = makeSessionStore(db);
-  const identityKeyStore = makeIdentityKeyStore(db);
+  const address = new SignalProtocolAddress(partnerId, PARTNER_DEVICE_ID);
+  const store = makeSignalStore(db);
+  const builder = new SessionBuilder(store, address);
 
   // C11: SessionBuilder handles X3DH + Double Ratchet initialisation.
-  // Internally calls saveSession → stored in signal_sessions table.
-  await SessionBuilder.processPreKeyBundle(
-    preKeyBundle,
-    address,
-    sessionStore,
-    identityKeyStore,
-  );
+  // Internally calls storeSession → stored in signal_sessions table.
+  await builder.processPreKey({
+    registrationId: PARTNER_REGISTRATION_ID,
+    identityKey: ikB,
+    signedPreKey: {
+      keyId: bundle.spk_id,
+      publicKey: spkB,
+      signature: spkSig,
+    },
+    preKey:
+      opkId !== null && opkPub !== null
+        ? {
+            keyId: opkId,
+            publicKey: opkPub,
+          }
+        : undefined,
+  });
 }

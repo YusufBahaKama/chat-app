@@ -1,20 +1,13 @@
 /**
  * Signal Protocol key generation and management.
  *
- * C11 — Uses ONLY @signalapp/libsignal-client.
+ * C11 — Uses ONLY @privacyresearch/libsignal-protocol-typescript.
  * C3  — Private keys NEVER leave this module / the device.
  *
- * @signalapp/libsignal-client v0.56+ ships with a WASM build.
- * Hermes (React Native 0.72+) supports WebAssembly natively, so the
- * package works without additional native bindings.
+ * Replaced official node-gyp client with pure-TS port for React Native / Expo compatibility.
  */
 
-import {
-  PrivateKey,
-  PublicKey,
-  KEMKeyPair,
-  KEMPublicKey,
-} from '@signalapp/libsignal-client';
+import { KeyHelper } from '@privacyresearch/libsignal-protocol-typescript';
 import type { DB } from '@op-engineering/op-sqlite';
 
 /** Number of OPKs to generate on first install. */
@@ -29,15 +22,8 @@ export interface KeyBundle {
 }
 
 export interface LocalIdentityKey {
-  publicKey: Buffer;
-  privateKey: Buffer;
-}
-
-/** Generate a Curve25519 key pair. */
-function generateCurve25519Pair(): { privateKey: PrivateKey; publicKey: PublicKey } {
-  const privateKey = PrivateKey.generate();
-  const publicKey = privateKey.getPublicKey();
-  return { privateKey, publicKey };
+  publicKey: ArrayBuffer;
+  privateKey: ArrayBuffer;
 }
 
 /**
@@ -46,21 +32,17 @@ function generateCurve25519Pair(): { privateKey: PrivateKey; publicKey: PublicKe
  */
 export async function generateAndStoreKeys(db: DB): Promise<KeyBundle> {
   // Identity Key (IK)
-  const ik = generateCurve25519Pair();
+  const ik = await KeyHelper.generateIdentityKeyPair();
 
   // Signed Pre-Key (SPK)
-  const spk = generateCurve25519Pair();
   const spk_id = 1;
-
-  // Sign SPK public key with IK private key (Ed25519 via libsignal)
-  const spkPubBytes = spk.publicKey.serialize();
-  const spkSig = ik.privateKey.sign(spkPubBytes);
+  const spk = await KeyHelper.generateSignedPreKey(ik, spk_id);
 
   // One-Time Pre-Keys (OPKs)
-  const opks: Array<{ key_id: number; privateKey: PrivateKey; publicKey: PublicKey }> = [];
+  const opks = [];
   for (let i = 0; i < OPK_BATCH_SIZE; i++) {
-    const pair = generateCurve25519Pair();
-    opks.push({ key_id: i, ...pair });
+    const preKeyPair = await KeyHelper.generatePreKey(i);
+    opks.push(preKeyPair);
   }
 
   // Persist to SQLCipher (C3: private keys stay on device)
@@ -68,8 +50,8 @@ export async function generateAndStoreKeys(db: DB): Promise<KeyBundle> {
     'INSERT OR REPLACE INTO identity_keys (type, public_key, private_key) VALUES (?, ?, ?)',
     [
       'self',
-      ik.publicKey.serialize(),
-      ik.privateKey.serialize(),
+      Buffer.from(ik.pubKey),
+      Buffer.from(ik.privKey),
     ],
   );
 
@@ -79,9 +61,9 @@ export async function generateAndStoreKeys(db: DB): Promise<KeyBundle> {
      VALUES (?, 'signed', ?, ?, ?, 0)`,
     [
       spk_id,
-      spk.publicKey.serialize(),
-      spk.privateKey.serialize(),
-      spkSig,
+      Buffer.from(spk.keyPair.pubKey),
+      Buffer.from(spk.keyPair.privKey),
+      Buffer.from(spk.signature),
       0,
     ],
   );
@@ -90,59 +72,68 @@ export async function generateAndStoreKeys(db: DB): Promise<KeyBundle> {
     await db.executeAsync(
       'INSERT OR REPLACE INTO pre_keys (key_id, type, public_key, private_key, consumed) VALUES (?, ?, ?, ?, ?)',
       [
-        opk.key_id,
+        opk.keyId,
         'one_time',
-        opk.publicKey.serialize(),
-        opk.privateKey.serialize(),
+        Buffer.from(opk.keyPair.pubKey),
+        Buffer.from(opk.keyPair.privKey),
         0,
       ],
     );
   }
 
   return {
-    identity_key: Buffer.from(ik.publicKey.serialize()).toString('base64'),
-    signed_pre_key: Buffer.from(spk.publicKey.serialize()).toString('base64'),
-    spk_signature: Buffer.from(spkSig).toString('base64'),
+    identity_key: Buffer.from(ik.pubKey).toString('base64'),
+    signed_pre_key: Buffer.from(spk.keyPair.pubKey).toString('base64'),
+    spk_signature: Buffer.from(spk.signature).toString('base64'),
     spk_id,
     one_time_pre_keys: opks.map((o) => ({
-      key_id: o.key_id,
-      public_key: Buffer.from(o.publicKey.serialize()).toString('base64'),
+      key_id: o.keyId,
+      public_key: Buffer.from(o.keyPair.pubKey).toString('base64'),
     })),
   };
 }
 
 /** Load the local identity private key from SQLCipher. */
-export async function loadIdentityPrivateKey(db: DB): Promise<PrivateKey> {
+export async function loadIdentityPrivateKey(db: DB): Promise<ArrayBuffer> {
   const result = await db.executeAsync(
     "SELECT private_key FROM identity_keys WHERE type = 'self'",
   );
   const row = result.rows?.[0] as { private_key: Uint8Array } | undefined;
   if (!row) throw new Error('Identity key not found in local DB');
-  return PrivateKey.deserialize(Buffer.from(row.private_key));
+  return Buffer.from(row.private_key).buffer.slice(
+    Buffer.from(row.private_key).byteOffset,
+    Buffer.from(row.private_key).byteOffset + Buffer.from(row.private_key).byteLength
+  );
 }
 
 /** Load the local signed pre-key private key from SQLCipher. */
-export async function loadSignedPreKeyPrivate(db: DB): Promise<PrivateKey> {
+export async function loadSignedPreKeyPrivate(db: DB): Promise<ArrayBuffer> {
   const result = await db.executeAsync(
     "SELECT private_key FROM pre_keys WHERE type = 'signed' AND consumed = 0 LIMIT 1",
   );
   const row = result.rows?.[0] as { private_key: Uint8Array } | undefined;
   if (!row) throw new Error('Signed pre-key not found in local DB');
-  return PrivateKey.deserialize(Buffer.from(row.private_key));
+  return Buffer.from(row.private_key).buffer.slice(
+    Buffer.from(row.private_key).byteOffset,
+    Buffer.from(row.private_key).byteOffset + Buffer.from(row.private_key).byteLength
+  );
 }
 
 /** Load a specific OPK private key by key_id from SQLCipher. */
 export async function loadOneTimePreKeyPrivate(
   db: DB,
   keyId: number,
-): Promise<PrivateKey> {
+): Promise<ArrayBuffer> {
   const result = await db.executeAsync(
     "SELECT private_key FROM pre_keys WHERE type = 'one_time' AND key_id = ? LIMIT 1",
     [keyId],
   );
   const row = result.rows?.[0] as { private_key: Uint8Array } | undefined;
   if (!row) throw new Error(`OPK key_id=${keyId} not found`);
-  return PrivateKey.deserialize(Buffer.from(row.private_key));
+  return Buffer.from(row.private_key).buffer.slice(
+    Buffer.from(row.private_key).byteOffset,
+    Buffer.from(row.private_key).byteOffset + Buffer.from(row.private_key).byteLength
+  );
 }
 
 /** Mark an OPK as consumed after X3DH. */

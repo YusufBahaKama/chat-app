@@ -11,6 +11,7 @@
  *   7. Subscribe to message:delivered → mark delivered in store (Phase 4)
  */
 
+import 'react-native-get-random-values';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
