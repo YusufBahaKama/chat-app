@@ -8,7 +8,7 @@ workflows:
     scripts:
       - name: Install pnpm and dependencies
         script: |
-          corepack enable pnpm
+          npm install -g pnpm
           pnpm install
       - name: Expo Prebuild
         script: |
