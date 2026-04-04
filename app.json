@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "AnonChat",
+    "slug": "anon-chat",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.anonchat.app",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Used to secure your encryption keys"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.anonchat.app"
+    },
+    "plugins": [
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Allow AnonChat to use Face ID for secure key storage"
+        }
+      ]
+    ]
+  }
+}
