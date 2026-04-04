@@ -14,7 +14,7 @@ workflows:
       - name: Expo Prebuild
         script: |
           cd apps/mobile
-          npx expo prebuild --platform ios --clean
+          pnpm exec expo prebuild --platform ios --clean
       - name: Build Unsigned iOS App
         script: |
           cd apps/mobile/ios
