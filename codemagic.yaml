@@ -14,11 +14,15 @@ workflows:
       - name: Expo Prebuild
         script: |
           set -e
-          cd apps/mobile
+          # Codemagic might already set the working directory to apps/mobile
+          if [ -d "apps/mobile" ]; then
+            cd apps/mobile
+          fi
+          
           echo "Running expo prebuild..."
           pnpm exec expo prebuild --platform ios --clean --no-install
           
-          echo "Files in apps/mobile after prebuild:"
+          echo "Files after prebuild:"
           ls -la
           
           if [ ! -d "ios" ]; then
@@ -31,7 +35,15 @@ workflows:
           pod install
       - name: Build Unsigned iOS App
         script: |
-          cd apps/mobile/ios
+          set -e
+          if [ -d "apps/mobile/ios" ]; then
+            cd apps/mobile/ios
+          elif [ -d "ios" ]; then
+            cd ios
+          else
+            echo "Failed to find ios directory"
+            exit 1
+          fi
           
           # Expo automatically generates the workspace and scheme based on app.json
           WORKSPACE=$(ls -d *.xcworkspace | head -1)
