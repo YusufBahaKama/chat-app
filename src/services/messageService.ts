@@ -6,7 +6,7 @@
  *   handleIncoming → decrypt → persist to SQLCipher → POST /api/v1/messages/ack
  */
 
-import { API_BASE_URL } from '../config';
+import { Config } from '../config';
 import { getDatabase } from '../db/database';
 import { encryptMessage, decryptMessage } from '../crypto/doubleRatchet';
 
@@ -47,7 +47,7 @@ export async function sendMessage(opts: OutboundMessage): Promise<string> {
     opts.plaintext,
   );
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/messages/send`, {
+  const response = await fetch(`${Config.API_BASE_URL}/api/v1/messages/send`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ async function ackMessage(
   sessionToken: string,
   deviceToken: string,
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/messages/ack`, {
+  const response = await fetch(`${Config.API_BASE_URL}/api/v1/messages/ack`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

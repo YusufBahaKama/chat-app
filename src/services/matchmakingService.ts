@@ -5,7 +5,7 @@
  * On match:found, triggers X3DH (via SessionBuilder) and persists the session.
  */
 
-import { API_BASE_URL } from '../config';
+import { Config } from '../config';
 import { getDatabase } from '../db/database';
 import { performX3DH, type PartnerBundle } from './x3dhService';
 import { secureWipeSession } from '../db/database';
@@ -17,7 +17,7 @@ export interface JoinQueueOptions {
 
 /** POST /api/v1/match/join */
 export async function joinQueue({ deviceToken }: JoinQueueOptions): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/match/join`, {
+  const response = await fetch(`${Config.API_BASE_URL}/api/v1/match/join`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -78,7 +78,7 @@ export async function leaveSession(
   // C9: wipe local key material BEFORE calling the server
   await secureWipeSession(db, sessionId);
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/match/leave`, {
+  const response = await fetch(`${Config.API_BASE_URL}/api/v1/match/leave`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ export async function blockSession(
   // C9: wipe local key material BEFORE calling the server
   await secureWipeSession(db, sessionId);
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/block`, {
+  const response = await fetch(`${Config.API_BASE_URL}/api/v1/block`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -11,7 +11,7 @@
  */
 
 import { io, Socket } from 'socket.io-client';
-import { WS_URL } from '../config';
+import { Config } from '../config';
 import type { PartnerBundle } from './x3dhService';
 
 export type MatchFoundPayload = {
@@ -55,7 +55,7 @@ let _socket: Socket | null = null;
 export function connectSocket(clientId: string): Socket {
   if (_socket?.connected) return _socket;
 
-  _socket = io(WS_URL, {
+  _socket = io(Config.WS_URL, {
     auth: { client_id: clientId },
     transports: ['websocket'],
     reconnection: true,

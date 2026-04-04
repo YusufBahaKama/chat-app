@@ -13,9 +13,10 @@
 
 import 'react-native-get-random-values';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { Config, bootstrapConfig, saveDevUrl } from './src/config';
 import { getDatabase } from './src/db/database';
 import { getOrRegister } from './src/services/registrationService';
 import {
@@ -36,6 +37,8 @@ import type { MessageDeliveredPayload } from './src/services/socketService';
 export default function App() {
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [devUrlInput, setDevUrlInput] = useState('');
 
   const {
     setIdentity,
@@ -49,9 +52,14 @@ export default function App() {
 
   useEffect(() => {
     let teardown: (() => void) | null = null;
+    setInitError(null);
+    setReady(false);
 
     async function init() {
       try {
+        await bootstrapConfig();
+        setDevUrlInput(Config.API_BASE_URL);
+
         // 1. Open encrypted DB
         await getDatabase();
 
@@ -158,13 +166,33 @@ export default function App() {
       teardown?.();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [retryCount]);
 
   if (initError !== null) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Startup error</Text>
         <Text style={styles.errorDetail} selectable>{initError}</Text>
+
+        <View style={styles.devBox}>
+          <Text style={styles.devLabel}>Dev API URL:</Text>
+          <TextInput
+            style={styles.devInput}
+            value={devUrlInput}
+            onChangeText={setDevUrlInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TouchableOpacity 
+            style={styles.devButton} 
+            onPress={async () => {
+               await saveDevUrl(devUrlInput);
+               setRetryCount(c => c + 1);
+            }}
+          >
+            <Text style={styles.devButtonText}>Save & Retry</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -202,5 +230,39 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 13,
     textAlign: 'center',
+    maxHeight: 200,
+  },
+  devBox: {
+    marginTop: 32,
+    width: '100%',
+    backgroundColor: '#1a1a1a',
+    padding: 16,
+    borderRadius: 8,
+  },
+  devLabel: {
+    color: '#aaa',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  devInput: {
+    backgroundColor: '#000',
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 6,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  devButton: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  devButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

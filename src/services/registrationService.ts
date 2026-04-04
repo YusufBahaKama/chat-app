@@ -11,7 +11,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { getDatabase } from '../db/database';
 import { generateAndStoreKeys } from '../crypto/signalKeys';
-import { API_BASE_URL } from '../config';
+import { Config } from '../config';
 
 const CLIENT_ID_KEY = 'anonchat_client_id';
 const DEVICE_TOKEN_KEY = 'anonchat_device_token';
@@ -39,7 +39,7 @@ async function register(): Promise<RegistrationResult> {
   const db = await getDatabase();
   const keyBundle = await generateAndStoreKeys(db);
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/keys/register`, {
+  const response = await fetch(`${Config.API_BASE_URL}/api/v1/keys/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(keyBundle),
