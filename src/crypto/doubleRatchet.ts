@@ -50,7 +50,7 @@ export async function encryptMessage(
   const msg = await cipher.encrypt(plaintextBuffer);
 
   return {
-    ciphertext: msg.body ?? '',
+    ciphertext: Buffer.from(msg.body ?? '', 'binary').toString('base64'),
     cipherType: msg.type,
   };
 }
@@ -71,10 +71,11 @@ export async function decryptMessage(
 
   let plaintextBytes: ArrayBuffer;
 
+  const binaryStr = Buffer.from(ciphertextString, 'base64').toString('binary');
   if (cipherType === 3) {
-    plaintextBytes = await cipher.decryptPreKeyWhisperMessage(ciphertextString, 'binary');
+    plaintextBytes = await cipher.decryptPreKeyWhisperMessage(binaryStr, 'binary');
   } else {
-    plaintextBytes = await cipher.decryptWhisperMessage(ciphertextString, 'binary');
+    plaintextBytes = await cipher.decryptWhisperMessage(binaryStr, 'binary');
   }
 
   return Buffer.from(plaintextBytes).toString('utf8');

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true,
+    "skipLibCheck": true,
     "paths": {
       "@chat-app/shared": ["../../packages/shared/src/index.ts"]
     }

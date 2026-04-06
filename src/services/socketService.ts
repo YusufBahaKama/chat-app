@@ -18,6 +18,7 @@ export type MatchFoundPayload = {
   partner_bundle: PartnerBundle;
   session_token: string;
   partner_id: string;
+  role: 'initiator' | 'responder';
 };
 
 export type SessionTerminatedPayload = {

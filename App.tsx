@@ -25,6 +25,7 @@ import {
   onSocketEvent,
 } from './src/services/socketService';
 import { handleMatchFound } from './src/services/matchmakingService';
+import { sendMessage } from './src/services/messageService';
 import { secureWipeSession } from './src/db/database';
 import { handleIncomingMessage } from './src/services/messageService';
 import { useAppStore } from './src/store';
@@ -68,22 +69,43 @@ export default function App() {
         setIdentity(clientId, deviceToken);
 
         // 3. Connect Socket.IO
-        connectSocket(clientId);
+        const sock = connectSocket(clientId);
+        sock.on('connect', () => console.log('[Socket] connected, id=', sock.id));
+        sock.on('connect_error', (err) => console.error('[Socket] connect_error:', err.message));
 
         // 4. match:found handler
         const offMatch = onSocketEvent(
           'match:found',
           async (payload: MatchFoundPayload) => {
+            console.log('[match:found] received, role=', payload.role, 'partner=', payload.partner_id);
             try {
               const session = await handleMatchFound({
                 partner_bundle: payload.partner_bundle,
                 session_token: payload.session_token,
-                partner_id: payload.partner_id ?? payload.session_token,
+                partner_id: payload.partner_id,
+                role: payload.role,
               });
               addSession(session);
+
+              // Initiator sends a silent ping so the responder's Double Ratchet
+              // session is established immediately — both sides can then send freely.
+              if (payload.role === 'initiator') {
+                const { deviceToken: dt } = useAppStore.getState();
+                if (dt) {
+                  sendMessage({
+                    sessionId: session.sessionId,
+                    sessionToken: session.sessionToken,
+                    partnerId: session.partnerId,
+                    deviceToken: dt,
+                    plaintext: '\x00',
+                  }).catch(() => { /* non-fatal */ });
+                }
+              }
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);
+              console.error('[match:found] handler error:', msg);
               setError(`Match setup failed: ${msg}`);
+              useAppStore.getState().setMatchStatus('idle');
             }
           },
         );
@@ -121,6 +143,8 @@ export default function App() {
                 session.sessionToken,
                 state.deviceToken,
               );
+              // Ignore silent session-init pings from the initiator
+              if (stored.plaintext === '\x00') return;
               appendMessage(session.sessionId, stored);
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);

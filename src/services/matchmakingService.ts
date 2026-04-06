@@ -53,6 +53,7 @@ export interface MatchFoundPayload {
   partner_bundle: PartnerBundle;
   session_token: string;
   partner_id: string;
+  role: 'initiator' | 'responder';
 }
 
 export interface ActiveSession {
@@ -74,7 +75,19 @@ export async function handleMatchFound(
   const sessionId = payload.session_token;
   const partnerId = payload.partner_id;
 
-  await performX3DH(db, sessionId, partnerId, payload.partner_bundle);
+  if (payload.role === 'initiator') {
+    // Initiator runs X3DH / processPreKey to build the outbound session.
+    await performX3DH(db, sessionId, partnerId, payload.partner_bundle);
+  } else {
+    // Responder: just persist session metadata. The Signal session record is
+    // created automatically when the first PreKeyWhisperMessage is decrypted.
+    const now = Math.floor(Date.now() / 1000);
+    await db.execute(
+      `INSERT OR REPLACE INTO sessions (session_id, partner_id, created_at, last_active_at)
+       VALUES (?, ?, ?, ?)`,
+      [sessionId, partnerId, now, now],
+    );
+  }
 
   return {
     sessionId,

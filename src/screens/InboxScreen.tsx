@@ -81,7 +81,7 @@ function SessionRow({ session, deviceToken, onOpen, onLeave }: SessionRowProps) 
 // ---------------------------------------------------------------------------
 
 export function InboxScreen({ navigation }: Props) {
-  const { clientId, deviceToken, matchStatus, sessions, setMatchStatus, removeSession, setError } =
+  const { clientId, deviceToken, matchStatus, sessions, error, setMatchStatus, removeSession, setError } =
     useAppStore();
 
   const handleOpenChat = useCallback(
@@ -174,6 +174,12 @@ export function InboxScreen({ navigation }: Props) {
           contentContainerStyle={styles.list}
         />
       )}
+
+      {error ? (
+        <TouchableOpacity onPress={() => setError(null)} style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{error}</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <View style={styles.footer}>
         {isSearching ? (
@@ -319,5 +325,18 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  errorBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#2a1a1a',
+    borderWidth: 1,
+    borderColor: '#5c2a2a',
+    borderRadius: 8,
+    padding: 12,
+  },
+  errorBannerText: {
+    color: '#e05252',
+    fontSize: 13,
   },
 });
